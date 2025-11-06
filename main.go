@@ -4,15 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-)
 
-type User struct {
-	ID       int64
-	Name     string
-	Username string
-	Icon     string
-	Email    string
-}
+	"github.com/pingg-chat/pingg/config"
+	"github.com/pingg-chat/pingg/models"
+	"github.com/pingg-chat/pingg/utils"
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -27,7 +23,10 @@ func main() {
 		return
 	}
 
-	user := User{ID: id}
+	config.SetID(id)
 
-	dd(user)
+	user := models.User{ID: id}
+	user.Load()
+
+	utils.Dd(user)
 }

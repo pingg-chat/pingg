@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func dd(v ...interface{}) {
+func Dd(v ...interface{}) {
 	for _, val := range v {
 		b, _ := json.MarshalIndent(val, "", "  ")
 		fmt.Println(string(b))
