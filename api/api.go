@@ -10,12 +10,14 @@ import (
 )
 
 func Get(path string) {
+	// TODO: implementar retorno da função passando o tipo generics
 	makeRequest(path, "GET")
 }
 
 func makeRequest(path string, method string) {
 	client := &http.Client{}
 
+	// TODO: moveer o url base para o config
 	apiUrl := "http://127.0.0.1:8000/" + path
 
 	req, err := http.NewRequest(method, apiUrl, nil)
@@ -23,7 +25,6 @@ func makeRequest(path string, method string) {
 	if err != nil {
 		// tratar erro
 		utils.Dd("Error on New Request", err)
-		return
 	}
 
 	id := config.GetID()
@@ -38,7 +39,6 @@ func makeRequest(path string, method string) {
 		// tratar erro
 		fmt.Println("Error on Client Do", err)
 		utils.Dd("Error on Client Do", err)
-		return
 	}
 
 	defer resp.Body.Close()
@@ -46,8 +46,7 @@ func makeRequest(path string, method string) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		utils.Dd("Error on ReadAll", err)
-		return
 	}
 
-	utils.Dd(string(body))
+	// TODO: ajustar o TODO correto usando unmaschall para tipar usando generics
 }
