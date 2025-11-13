@@ -11,11 +11,10 @@ type User struct {
 	Icon      string
 	Email     string
 	Workspace *Workspace
+	Channels  []*Channel
 }
 
 func (u *User) Load() error {
-	workspace := Workspace{}
-	u.Workspace = &workspace
 	user, err := api.Get[User]("me")
 
 	if err != nil {
