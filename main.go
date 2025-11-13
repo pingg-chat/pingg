@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+
+	// Checking if user id is provided
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run . <user_id>")
 		return
@@ -23,10 +25,17 @@ func main() {
 		return
 	}
 
+	// Setting user id on config
 	config.SetID(id)
 
+	// Load user from api
 	user := models.User{ID: id}
-	user.Load()
+	err = user.Load()
 
-	utils.Dd(user)
+	if err != nil {
+		utils.Dd("Error on Load User", err)
+	}
+
+	// Printing user
+	utils.Dd("Main User.Load", user)
 }

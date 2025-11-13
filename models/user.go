@@ -1,6 +1,8 @@
 package models
 
-import "github.com/pingg-chat/pingg/api"
+import (
+	"github.com/pingg-chat/pingg/api"
+)
 
 type User struct {
 	ID       int64
@@ -10,12 +12,13 @@ type User struct {
 	Email    string
 }
 
-func (u *User) Load() {
+func (u *User) Load() error {
+	user, err := api.Get[User]("me")
 
-	api.Get("me")
+	if err != nil {
+		return err
+	}
 
-	u.Name = "John Doe"
-	u.Username = "johndoe"
-	u.Icon = "https://example.com/icon.png"
-	u.Email = "joe@doe.com"
+	*u = *user
+	return nil
 }
