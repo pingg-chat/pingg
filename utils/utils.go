@@ -14,3 +14,9 @@ func Dd(v ...interface{}) {
 
 	os.Exit(0)
 }
+
+func Dump(title string, v interface{}) {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	fmt.Println(title)
+	fmt.Println(string(b))
+}

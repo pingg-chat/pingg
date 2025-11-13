@@ -36,6 +36,6 @@ func main() {
 		utils.Dd("Error on Load User", err)
 	}
 
-	// Printing user
-	utils.Dd("Main User.Load", user)
+
+	utils.Dump("User:", user)
 }

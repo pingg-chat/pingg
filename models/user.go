@@ -5,14 +5,17 @@ import (
 )
 
 type User struct {
-	ID       int64
-	Name     string
-	Username string
-	Icon     string
-	Email    string
+	ID        int64
+	Name      string
+	Username  string
+	Icon      string
+	Email     string
+	Workspace *Workspace
 }
 
 func (u *User) Load() error {
+	workspace := Workspace{}
+	u.Workspace = &workspace
 	user, err := api.Get[User]("me")
 
 	if err != nil {
