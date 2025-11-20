@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-
 	// Checking if user id is provided
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run . <user_id>")
@@ -35,7 +34,10 @@ func main() {
 	if err != nil {
 		utils.Dd("Error on Load User", err)
 	}
+	// travar o processo ... só sair com CTRL+C
+	fmt.Println("Press CTRL+C to exit")
 
+	utils.WaitForCtrlC()
 
 	utils.Dump("User:", user)
 }

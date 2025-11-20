@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 )
 
 func Dd(v ...interface{}) {
@@ -19,4 +20,9 @@ func Dump(title string, v interface{}) {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(title)
 	fmt.Println(string(b))
+}
+func WaitForCtrlC() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
 }

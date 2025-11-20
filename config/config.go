@@ -43,4 +43,3 @@ func SetID(id int64) {
 func GetID() string {
 	return fmt.Sprintf("%d", userID)
 }
-
