@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -9,12 +11,20 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/pingg-chat/pingg/models"
+	"golang.org/x/term"
 )
 
 const (
 	sidebarWidth  = 30
 	minChatHeight = 10
+)
+
+// Terminal dimensions from environment (for SSH sessions)
+var (
+	envWidth  int
+	envHeight int
 )
 
 type panelType int
@@ -37,6 +47,7 @@ type Model struct {
 	viewport           viewport.Model
 	messages           []Message
 	ready              bool
+	lastKey            string // debug: last key pressed
 }
 
 type Message struct {
@@ -79,23 +90,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
+	// Debug: capture ALL messages
+	m.lastKey = fmt.Sprintf("msg=%T", msg)
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		// Use environment dimensions if available (for SSH), otherwise use detected size
+		if envWidth > 0 && envHeight > 0 {
+			m.width = envWidth
+			m.height = envHeight
+		} else {
+			m.width = msg.Width
+			m.height = msg.Height
+		}
 
 		if !m.ready {
-			m.viewport = viewport.New(msg.Width-sidebarWidth-4, msg.Height-8)
+			m.viewport = viewport.New(m.width-sidebarWidth-4, m.height-8)
 			m.viewport.SetContent(m.renderMessages())
 			m.ready = true
 		} else {
-			m.viewport.Width = msg.Width - sidebarWidth - 4
-			m.viewport.Height = msg.Height - 8
+			m.viewport.Width = m.width - sidebarWidth - 4
+			m.viewport.Height = m.height - 8
 		}
 
 		return m, nil
 
 	case tea.KeyMsg:
+		// Debug: capture key details
+		m.lastKey = fmt.Sprintf("K:t=%d s=%q r=%v", msg.Type, msg.String(), msg.Runes)
+
 		// Global quit
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -147,6 +170,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateChannelsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	channels := m.getChannels()
 
+	// Check for Enter key - multiple ways it can arrive via SSH
+	isEnter := msg.Type == tea.KeyEnter ||
+		msg.String() == "enter" ||
+		(len(msg.Runes) == 1 && (msg.Runes[0] == '\r' || msg.Runes[0] == '\n'))
+
+	if isEnter {
+		m.activePanel = messagesPanel
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "j", "down":
 		if m.selectedChannelIdx < len(channels)-1 {
@@ -156,14 +189,22 @@ func (m Model) updateChannelsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.selectedChannelIdx > 0 {
 			m.selectedChannelIdx--
 		}
-	case "enter":
-		m.activePanel = messagesPanel
 	}
 	return m, nil
 }
 
 func (m Model) updateDMsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	dms := m.getDMs()
+
+	// Check for Enter key - multiple ways it can arrive via SSH
+	isEnter := msg.Type == tea.KeyEnter ||
+		msg.String() == "enter" ||
+		(len(msg.Runes) == 1 && (msg.Runes[0] == '\r' || msg.Runes[0] == '\n'))
+
+	if isEnter {
+		m.activePanel = messagesPanel
+		return m, nil
+	}
 
 	switch msg.String() {
 	case "j", "down":
@@ -174,8 +215,6 @@ func (m Model) updateDMsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.selectedDMIdx > 0 {
 			m.selectedDMIdx--
 		}
-	case "enter":
-		m.activePanel = messagesPanel
 	}
 	return m, nil
 }
@@ -209,12 +248,25 @@ func (m Model) updateMessagesPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateInputPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg.String() {
-	case "esc":
+	// Debug: store last key info
+	m.lastKey = fmt.Sprintf("type=%d str=%q runes=%v", msg.Type, msg.String(), msg.Runes)
+
+	// Check for Enter key - multiple ways it can arrive via SSH
+	isEnter := msg.Type == tea.KeyEnter ||
+		msg.String() == "enter" ||
+		msg.String() == "ctrl+j" ||
+		(len(msg.Runes) == 1 && (msg.Runes[0] == '\r' || msg.Runes[0] == '\n'))
+
+	// Check for Esc key
+	isEsc := msg.Type == tea.KeyEsc || msg.String() == "esc"
+
+	if isEsc {
 		m.textInput.Blur()
 		m.activePanel = messagesPanel
 		return m, nil
-	case "enter":
+	}
+
+	if isEnter {
 		if m.textInput.Value() != "" {
 			// Add message
 			newMsg := Message{
@@ -456,12 +508,16 @@ func (m Model) renderChat() string {
 
 	inputBox := inputStyle.Render(inputContent)
 
-	// Help
+	// Help with debug info
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
 		Padding(0, 1)
 
-	help := helpStyle.Render("1: Channels | 2: DMs | 3: Messages | 4: Input | j/k: Navigate | Enter: Select | i: Focus input | Esc/Ctrl+C: Quit")
+	debugInfo := ""
+	if m.lastKey != "" {
+		debugInfo = fmt.Sprintf(" | DEBUG: %s", m.lastKey)
+	}
+	help := helpStyle.Render(fmt.Sprintf("1-4:panels | j/k:nav | Enter:send | esc:back | w=%d h=%d%s", m.width, m.height, debugInfo))
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -529,11 +585,71 @@ func (m Model) getSelectedChannel() *models.Channel {
 	return nil
 }
 
+// SetTerminalSize sets the terminal dimensions from environment variables
+// This is useful when running via SSH where the terminal size might not be detected
+func SetTerminalSize(width, height int) {
+	envWidth = width
+	envHeight = height
+}
+
+// LoadTerminalSizeFromEnv loads terminal dimensions from environment variables
+// Supports both WHISP_COLS/WHISP_ROWS (from Whisp SSH) and TERM_WIDTH/TERM_HEIGHT
+func LoadTerminalSizeFromEnv() {
+	// Try WHISP variables first (from SSH)
+	if w := os.Getenv("WHISP_COLS"); w != "" {
+		if width, err := strconv.Atoi(w); err == nil && width > 0 {
+			envWidth = width
+		}
+	} else if w := os.Getenv("TERM_WIDTH"); w != "" {
+		if width, err := strconv.Atoi(w); err == nil && width > 0 {
+			envWidth = width
+		}
+	}
+
+	if h := os.Getenv("WHISP_ROWS"); h != "" {
+		if height, err := strconv.Atoi(h); err == nil && height > 0 {
+			envHeight = height
+		}
+	} else if h := os.Getenv("TERM_HEIGHT"); h != "" {
+		if height, err := strconv.Atoi(h); err == nil && height > 0 {
+			envHeight = height
+		}
+	}
+}
+
 func Run(user *models.User) error {
+	// Load terminal size from environment if available
+	LoadTerminalSizeFromEnv()
+
+	// Force color profile for SSH sessions
+	// This ensures colors work correctly when running via SSH
+	lipgloss.SetColorProfile(termenv.TrueColor)
+
+	// Put terminal in raw mode for SSH sessions
+	// This is necessary because Whisp sets canonical mode by default
+	fd := int(os.Stdin.Fd())
+	if term.IsTerminal(fd) {
+		oldState, err := term.MakeRaw(fd)
+		if err == nil {
+			defer term.Restore(fd, oldState)
+		}
+	}
+
+	model := NewModel(user)
+
+	// If we already have dimensions from env, set them
+	if envWidth > 0 && envHeight > 0 {
+		model.width = envWidth
+		model.height = envHeight
+	}
+
 	p := tea.NewProgram(
-		NewModel(user),
+		model,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
+		// Enable explicit input/output for SSH sessions
+		tea.WithInput(os.Stdin),
+		tea.WithOutput(os.Stdout),
 	)
 	_, err := p.Run()
 	return err

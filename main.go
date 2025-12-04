@@ -12,17 +12,32 @@ import (
 )
 
 func main() {
-	// Checking if user id is provided
+	// Usage: pingg <user_id> [width] [height]
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run . <user_id>")
+		fmt.Println("Usage: pingg <user_id> [width] [height]")
 		return
 	}
 
 	id, err := strconv.ParseInt(os.Args[1], 10, 64)
-
 	if err != nil {
 		fmt.Println("Invalid user ID:", os.Args[1])
 		return
+	}
+
+	// Parse optional width and height arguments
+	var width, height int
+	if len(os.Args) >= 4 {
+		if w, err := strconv.Atoi(os.Args[2]); err == nil && w > 0 {
+			width = w
+		}
+		if h, err := strconv.Atoi(os.Args[3]); err == nil && h > 0 {
+			height = h
+		}
+	}
+
+	// Set terminal size if provided
+	if width > 0 && height > 0 {
+		tui.SetTerminalSize(width, height)
 	}
 
 	// Setting user id on config
@@ -38,6 +53,6 @@ func main() {
 
 	// Run TUI
 	if err := tui.Run(&user); err != nil {
-		utils.Dd("Error running TUI", err)
+		utils.Dd("Error running TUI", err.Error())
 	}
 }
